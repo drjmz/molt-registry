@@ -1,7 +1,7 @@
 const { ethers } = require("ethers");
 
 // ============ CONFIG ============
-const REGISTRY_ADDRESS = "0x968423cB318075e8c8fD3825F75dCc6f1c846e53";
+const REGISTRY_ADDRESS = "0x0A21d1864Ced6A8DFBd3b862822D866e6250A8a0"; // V2
 const RPC_URL = process.env.BASE_RPC || "https://mainnet.base.org";
 const REGISTRATION_FEE = "0.0001"; // ETH
 
@@ -10,7 +10,8 @@ const ABI = [
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function agents(uint256 tokenId) view returns (string endpoints, address wallet, bool isVerified)",
   "function tokenURI(uint256 tokenId) view returns (string)",
-  "function registerAgent(address to, string uri, string endpoints) payable returns (uint256)"
+  "function registerAgent(address to, string uri, string endpoints) payable returns (uint256)",
+  "function logReputation(uint256 agentId, uint8 score) payable" // V2 Reputation
 ];
 
 // ============ TOOL LOGIC ============
@@ -101,9 +102,31 @@ async function register({ endpoints, uri }) {
   }
 }
 
+/**
+ * Log Reputation (Requires Wallet)
+ */
+async function rate({ agentId, score }) {
+  const provider = await getProvider();
+  const wallet = await getWallet(provider);
+  const contract = new ethers.Contract(REGISTRY_ADDRESS, ABI, wallet);
+
+  try {
+    const fee = ethers.parseEther(REGISTRATION_FEE); // Using same fee as registration for now
+    const tx = await contract.logReputation(agentId, score, { value: fee });
+    
+    console.log(`🚀 TX Sent: ${tx.hash}`);
+    const receipt = await tx.wait();
+
+    return `✅ REPUTATION LOGGED!\nTransaction: ${tx.hash}\nBlock: ${receipt.blockNumber}\nScore: ${score}/100.`;
+  } catch (e) {
+    return `❌ Reputation Logging Failed: ${e.message}`;
+  }
+}
+
 // ============ EXPORT ============
 module.exports = {
   status,
   lookup,
-  register
+  register,
+  rate
 };
